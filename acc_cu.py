@@ -1,11 +1,12 @@
 #!/usr/bin/python
 import MySQLdb, time, urllib, json, datetime
+import accountinfo
 cautiousblocks = ["{{anonblock}}","{{schoolblock}}","vandalism", "school"]
 proxyblocks = ["{{blockedproxy}}","{{webhostblock}}","{{colocationwebhost}}"]
-db = MySQLdb.connect(host="localhost",    # your host, usually localhost
-                     user="dqscript",         # your username
-                     passwd="BravoackenDelta",  # your password
-                     db="production")        # name of the data base
+db = MySQLdb.connect(host=accountinfo.host,    # your host, usually localhost
+                     user=accountinfo.user,         # your username
+                     passwd=accountinfo.passwd,  # your password
+                     db=accountinfo.db)        # name of the data base
 cur = db.cursor()
 cur.execute("SELECT id,status,forwardedip FROM production.request where status != 'Closed' and status != 'Hold' and status != 'Checkuser' and emailconfirm RLIKE 'confirmed' and blockcheck = 0;")
 table = cur.fetchall()
