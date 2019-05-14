@@ -8,7 +8,7 @@ db = MySQLdb.connect(host=accountinfo.host,    # your host, usually localhost
                      passwd=accountinfo.passwd,  # your password
                      db=accountinfo.db)        # name of the data base
 cur = db.cursor()
-cur.execute("SELECT id,status,forwardedip FROM production.request where status != 'Closed' and status != 'Hold' and status != 'Checkuser' and emailconfirm RLIKE 'confirmed' and blockcheck = 0;")
+cur.execute("SELECT id,status,forwardedip FROM production.request r where status != 'Closed' and status != 'Hold' and status != 'Checkuser' and emailconfirm RLIKE 'confirmed' and not exists (select id from production_reporting.botcheck b where r.id = b.id);")
 table = cur.fetchall()
 requestnumbers=list()
 blocklist=list()
@@ -28,17 +28,17 @@ for row in table:
         data = json.loads(response.read())
         try:blockdata=data["query"]["blocks"][0]
         except:
-            cur.execute("UPDATE production.request SET blockcheck='1' WHERE id="+str(row[0])+";")
+            cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
             db.commit()
             continue
         reason = blockdata["reason"]
         try:acc = blockdata["nocreate"]
         except:
-            cur.execute("UPDATE production.request SET blockcheck='1' WHERE id="+str(row[0])+";")
+            cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
             db.commit()
             continue
         if "ACC ignore" in reason:
-            cur.execute("UPDATE production.request SET blockcheck='1' WHERE id="+str(row[0])+";")
+            cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
             db.commit()
             continue
         ip = blockdata["user"]
@@ -47,18 +47,15 @@ for row in table:
         for blockreason in cautiousblocks:
             if blockreason.lower() in reason.lower():
                 warn = True
-                cur.execute("UPDATE production.request SET blockcheck='1' WHERE id="+str(row[0])+";")
+                cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
                 db.commit()
                 continue
         for blockreason in proxyblocks:
             if blockreason.lower() in reason.lower():
                 warn = True
-                cur.execute("UPDATE production.request SET blockcheck='1' WHERE id="+str(row[0])+";")
-                db.commit()
+                cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
                 cur.execute("UPDATE production.request SET status='Proxy' WHERE id="+str(row[0])+";")
-                db.commit()
                 cur.execute("INSERT INTO production.comment (time, user, comment, visibility, request) VALUES (\""+time.strftime('%Y-%m-%d %H:%M:%S')+"\", '1733', \"Block detected requiring proxy check\", \"user\", "+str(row[0])+");")
-                db.commit()
                 cur.execute("INSERT INTO production.log (objectid, objecttype, user, action, timestamp) VALUES ("+str(row[0])+", \"Request\", 1733, \"Deferred to proxy check\", \""+time.strftime('%Y-%m-%d %H:%M:%S')+"\");")
                 db.commit()
                 continue
@@ -66,15 +63,11 @@ for row in table:
         blocklist.append(row[0])
         try:cidr = ip.split("/")
         except:cidr = False
-        cur.execute("UPDATE production.request SET blockcheck='1' WHERE id="+str(row[0])+";")
-        db.commit()
+        cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
         cur.execute("UPDATE production.request SET status='Checkuser' WHERE id="+str(row[0])+";")
-        db.commit()
         cur.execute("INSERT INTO production.comment (time, user, comment, visibility, request) VALUES (\""+time.strftime('%Y-%m-%d %H:%M:%S')+"\", '1733', \"Block detected requiring CU check\", \"user\", "+str(row[0])+");")
         db.commit()
         time.sleep(1)
         cur.execute("INSERT INTO production.log (objectid, objecttype, user, action, timestamp) VALUES ("+str(row[0])+", \"Request\", 1733, \"Deferred to checkusers\", \""+time.strftime('%Y-%m-%d %H:%M:%S')+"\");")
-        db.commit()
-        cur.execute("UPDATE production.request SET blockcheck = 1 where status=\"Checkuser\";")
         db.commit()
 db.close()
