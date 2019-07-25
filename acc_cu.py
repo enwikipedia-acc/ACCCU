@@ -37,7 +37,7 @@ for row in table:
             cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
             db.commit()
             continue
-        if "ACC ignore" in reason:
+        if "acc ignore" in reason.lower():
             cur.execute("insert into production_reporting.botcheck SELECT "+str(row[0])+" FROM dual where not exists (select id from production_reporting.botcheck b where b.id = "+str(row[0])+");")
             db.commit()
             continue
